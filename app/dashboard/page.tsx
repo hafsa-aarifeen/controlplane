@@ -3,18 +3,33 @@
 import { useUser } from "@clerk/nextjs";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useBoards } from "@/lib/hooks/useBoards";
-
-// https://novel-buck-38.clerk.accounts.dev
 
 export default function DashboardPage() {
   const { user } = useUser();
-  const { createBoard } = useBoards();
+  const { createBoard, boards, loading, error } = useBoards();
 
   const handleCreateBoard = async () => {
     await createBoard({ title: "New Board" });
   };
+
+  if (loading) {
+    return (
+      <div>
+        <Loader2 /> <span>Loading your boards...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h2> Error loading boards</h2>
+        <p>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

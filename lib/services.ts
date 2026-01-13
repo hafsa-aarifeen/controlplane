@@ -31,20 +31,20 @@ export const boardService = {
 };
 
 export const columnService = {
-  //   async getColumns(
-  //     supabase: SupabaseClient,
-  //     boardId: string
-  //   ): Promise<Column[]> {
-  //     const { data, error } = await supabase
-  //       .from("columns")
-  //       .select("*")
-  //       .eq("board_id", boardId)
-  //       .order("sort_order", { ascending: true });
+  async getColumns(
+    supabase: SupabaseClient,
+    boardId: string
+  ): Promise<Column[]> {
+    const { data, error } = await supabase
+      .from("columns")
+      .select("*")
+      .eq("board_id", boardId)
+      .order("sort_order", { ascending: true });
 
-  //     if (error) throw error;
+    if (error) throw error;
 
-  //     return data || [];
-  //   },
+    return data || [];
+  },
 
   async createColumn(
     supabase: SupabaseClient,
