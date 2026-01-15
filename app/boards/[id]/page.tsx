@@ -21,12 +21,18 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useBoard } from "@/lib/hooks/useBoards";
-import { ColumnWithTasks, Task as TaskType } from "@/lib/supabase/models";
+import { ColumnWithTasks, Task } from "@/lib/supabase/models";
 import { SelectTrigger } from "@radix-ui/react-select";
 import { Calendar, MoreHorizontal, Plus, User } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { DndContext, useDroppable } from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 function DroppableColumn({
   column,
@@ -153,7 +159,22 @@ function DroppableColumn({
   );
 }
 
-function Task({ task }: { task: TaskType }) {
+function SortableTask({ task }: { task: Task }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const styles = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   function getPriorityColor(priority: "low" | "medium" | "high"): string {
     switch (priority) {
       case "high":
@@ -167,7 +188,7 @@ function Task({ task }: { task: TaskType }) {
     }
   }
   return (
-    <div>
+    <div ref={setNodeRef} style={styles} {...listeners} {...attributes}>
       <Card className="cursor-pointer hover:shadow-md transition-shadow">
         <CardContent className="p-3 sm:p-4">
           <div className="space-y-2 sm:space-y-3">
@@ -498,11 +519,16 @@ export default function BoardPage() {
                 onCreateTask={handleCreateTask}
                 onEditColumn={() => {}}
               >
-                <div className="space-y-3">
-                  {column.tasks.map((task, key) => (
-                    <Task key={key} task={task} />
-                  ))}
-                </div>
+                <SortableContext
+                  items={column.tasks.map((task) => task.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {column.tasks.map((task, key) => (
+                      <SortableTask key={key} task={task} />
+                    ))}
+                  </div>
+                </SortableContext>
               </DroppableColumn>
             ))}
           </div>
