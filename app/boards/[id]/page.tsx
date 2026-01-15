@@ -26,7 +26,18 @@ import { SelectTrigger } from "@radix-ui/react-select";
 import { Calendar, MoreHorizontal, Plus, User } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { DndContext, useDroppable } from "@dnd-kit/core";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  rectIntersection,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import {
   SortableContext,
   useSortable,
@@ -233,15 +244,83 @@ function SortableTask({ task }: { task: Task }) {
   );
 }
 
+function TaskOverlay({ task }: { task: Task }) {
+  function getPriorityColor(priority: "low" | "medium" | "high"): string {
+    switch (priority) {
+      case "high":
+        return "bg-red-500";
+      case "medium":
+        return "bg-yellow-500";
+      case "low":
+        return "bg-green-500";
+      default:
+        return "bg-yellow-500";
+    }
+  }
+  return (
+    <Card className="cursor-pointer hover:shadow-md transition-shadow">
+      <CardContent className="p-3 sm:p-4">
+        <div className="space-y-2 sm:space-y-3">
+          {/* Task Header */}
+          <div className="flex items-start justify-between">
+            <h4 className="font-medium text-gray-900 text-sm leading-tight flex-1 min-w-0 pr-2">
+              {task.title}
+            </h4>
+          </div>
+
+          {/* Task Description */}
+          <p className="text-xs text-gray-600 line-clamp-2">
+            {task.description || "No description."}
+          </p>
+
+          {/* Task Meta */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1 sm:space-x-2 min-w-0">
+              {task.assignee && (
+                <div className="flex items-center space-x-1 text-xs text-gray-500">
+                  <User className="h-3 w-3" />
+                  <span className="truncate">{task.assignee}</span>
+                </div>
+              )}
+              {task.due_date && (
+                <div className="flex items-center space-x-1 text-xs text-gray-500">
+                  <Calendar className="h-3 w-3" />
+                  <span className="truncate">{task.due_date}</span>
+                </div>
+              )}
+            </div>
+            <div
+              className={`w-2 h-2 rounded-full shrink-0 ${getPriorityColor(
+                task.priority
+              )}`}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function BoardPage() {
   const { id } = useParams<{ id: string }>();
-  const { board, updateBoard, columns, createRealTask } = useBoard(id);
+  const { board, updateBoard, columns, createRealTask, setColumns, moveTask } =
+    useBoard(id);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newColor, setNewColor] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   async function handleUpdateBoard(e: React.FormEvent) {
     e.preventDefault();
@@ -291,6 +370,101 @@ export default function BoardPage() {
         '[data-state="open"'
       ) as HTMLElement;
       if (trigger) trigger.click();
+    }
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    const taskId = event.active.id as string;
+    const task = columns
+      .flatMap((col) => col.tasks)
+      .find((task) => task.id === taskId);
+
+    if (task) {
+      setActiveTask(task);
+    }
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const sourceColumn = columns.find((col) =>
+      col.tasks.some((task) => task.id === activeId)
+    );
+
+    const targetColumn = columns.find((col) =>
+      col.tasks.some((task) => task.id === overId)
+    );
+
+    if (!sourceColumn || !targetColumn) return;
+
+    if (sourceColumn.id === targetColumn.id) {
+      const activeIndex = sourceColumn.tasks.findIndex(
+        (task) => task.id === activeId
+      );
+
+      const overIndex = targetColumn.tasks.findIndex(
+        (task) => task.id === overId
+      );
+
+      if (activeIndex !== overIndex) {
+        setColumns((prev: ColumnWithTasks[]) => {
+          const newColumns = [...prev];
+          const column = newColumns.find((col) => col.id === sourceColumn.id);
+          if (column) {
+            const tasks = [...column.tasks];
+            const [removed] = tasks.splice(activeIndex, 1);
+            tasks.splice(overIndex, 0, removed);
+            column.tasks = tasks;
+          }
+          return newColumns;
+        });
+      }
+    }
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const overId = over.id as string;
+
+    const targetColumn = columns.find((col) => col.id === overId);
+    if (targetColumn) {
+      const sourceColumn = columns.find((col) =>
+        col.tasks.some((task) => task.id === taskId)
+      );
+
+      if (sourceColumn && sourceColumn.id !== targetColumn.id) {
+        await moveTask(taskId, targetColumn.id, targetColumn.tasks.length);
+      }
+    } else {
+      // Check to see if were dropping on another task
+      const sourceColumn = columns.find((col) =>
+        col.tasks.some((task) => task.id === taskId)
+      );
+
+      const targetColumn = columns.find((col) =>
+        col.tasks.some((task) => task.id === overId)
+      );
+
+      if (sourceColumn && targetColumn) {
+        const oldIndex = sourceColumn.tasks.findIndex(
+          (task) => task.id === taskId
+        );
+
+        const newIndex = targetColumn.tasks.findIndex(
+          (task) => task.id === overId
+        );
+
+        if (oldIndex !== newIndex) {
+          await moveTask(taskId, targetColumn.id, newIndex);
+        }
+      }
     }
   }
 
@@ -499,11 +673,11 @@ export default function BoardPage() {
         {/* Board Columns */}
 
         <DndContext
-        // sensors={}
-        // collisionDetection={}
-        // onDragStart={}
-        // onDragOver={}
-        // onDragEnd={}
+          sensors={sensors}
+          collisionDetection={rectIntersection}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
         >
           <div
             className="flex flex-col lg:flex-row lg:space-x-6 lg:overflow-x-auto
@@ -531,6 +705,10 @@ export default function BoardPage() {
                 </SortableContext>
               </DroppableColumn>
             ))}
+
+            <DragOverlay>
+              {activeTask ? <TaskOverlay task={activeTask} /> : null}
+            </DragOverlay>
           </div>
         </DndContext>
       </main>

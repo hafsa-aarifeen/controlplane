@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { boardDataService, boardService, taskService } from "../services";
 import { useEffect, useState } from "react";
-import { Board, Column, ColumnWithTasks } from "../supabase/models";
+import { Board, Column, ColumnWithTasks, Task } from "../supabase/models";
 import { useSupabase } from "../supabase/SupabaseProvider";
 
 export function useBoards() {
@@ -142,6 +142,43 @@ export function useBoard(boardId: string) {
     }
   }
 
+  async function moveTask(
+    taskId: string,
+    newColumnId: string,
+    newOrder: number
+  ) {
+    try {
+      await taskService.moveTask(supabase!, taskId, newColumnId, newOrder);
+
+      setColumns((prev) => {
+        const newColumns = [...prev];
+
+        // Find and remove task from the old column
+        let taskToMove: Task | null = null;
+        for (const col of newColumns) {
+          const taskIndex = col.tasks.findIndex((task) => task.id === taskId);
+          if (taskIndex !== -1) {
+            taskToMove = col.tasks[taskIndex];
+            col.tasks.splice(taskIndex, 1);
+            break;
+          }
+        }
+
+        if (taskToMove) {
+          // Add task to new column
+          const targetColumn = newColumns.find((col) => col.id === newColumnId);
+          if (targetColumn) {
+            targetColumn.tasks.splice(newOrder, 0, taskToMove);
+          }
+        }
+
+        return newColumns;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to move task.");
+    }
+  }
+
   return {
     board,
     columns,
@@ -149,5 +186,7 @@ export function useBoard(boardId: string) {
     error,
     updateBoard,
     createRealTask,
+    setColumns,
+    moveTask,
   };
 }
