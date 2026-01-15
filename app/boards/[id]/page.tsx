@@ -26,8 +26,9 @@ import { SelectTrigger } from "@radix-ui/react-select";
 import { Calendar, MoreHorizontal, Plus, User } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { DndContext, useDroppable } from "@dnd-kit/core";
 
-function Column({
+function DroppableColumn({
   column,
   children,
   onCreateTask,
@@ -38,9 +39,19 @@ function Column({
   onCreateTask: (taskData: any) => Promise<void>;
   onEditColumn: (column: ColumnWithTasks) => void;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: column.id });
   return (
-    <div className="w-full lg:shrink-0 lg:w-80">
-      <div className="bg-white rounded-lg shadow-sm border">
+    <div
+      ref={setNodeRef}
+      className={`w-full lg:shrink-0 lg:w-80 ${
+        isOver ? "bg-blue-50 rounded-lg" : ""
+      }`}
+    >
+      <div
+        className={`bg-white rounded-lg shadow-sm border ${
+          isOver ? "ring-2 ring-blue-300" : ""
+        }`}
+      >
         {/* Column Header */}
         <div className="p-3 sm:p-4 border-b">
           <div className="flex items-center justify-between">
@@ -465,28 +476,37 @@ export default function BoardPage() {
         </div>
 
         {/* Board Columns */}
-        <div
-          className="flex flex-col lg:flex-row lg:space-x-6 lg:overflow-x-auto
+
+        <DndContext
+        // sensors={}
+        // collisionDetection={}
+        // onDragStart={}
+        // onDragOver={}
+        // onDragEnd={}
+        >
+          <div
+            className="flex flex-col lg:flex-row lg:space-x-6 lg:overflow-x-auto
             lg:pb-6 lg:px-2 lg:-mx-2 lg:[&::-webkit-scrollbar]:h-2
             lg:[&::-webkit-scrollbar-track]:bg-gray-100
             lg:[&::-webkit-scrollbar-thumb]:bg-gray-300 lg:[&::-webkit-scrollbar-thumb]:rounded-full
             space-y-4 lg:space-y-0"
-        >
-          {columns.map((column, key) => (
-            <Column
-              key={key}
-              column={column}
-              onCreateTask={handleCreateTask}
-              onEditColumn={() => {}}
-            >
-              <div className="space-y-3">
-                {column.tasks.map((task, key) => (
-                  <Task key={key} task={task} />
-                ))}
-              </div>
-            </Column>
-          ))}
-        </div>
+          >
+            {columns.map((column, key) => (
+              <DroppableColumn
+                key={key}
+                column={column}
+                onCreateTask={handleCreateTask}
+                onEditColumn={() => {}}
+              >
+                <div className="space-y-3">
+                  {column.tasks.map((task, key) => (
+                    <Task key={key} task={task} />
+                  ))}
+                </div>
+              </DroppableColumn>
+            ))}
+          </div>
+        </DndContext>
       </main>
     </div>
   );
