@@ -1,4 +1,4 @@
-# 🗂️ Trello Clone — Full Stack Next.js Application
+# 🗂️ ControlPlane — Full Stack Next.js Application
 
 A Trello-inspired task management web application built with Next.js App Router, focused on understanding modern full-stack application architecture, authentication workflows, reusable UI systems, and deployment best practices.
 
